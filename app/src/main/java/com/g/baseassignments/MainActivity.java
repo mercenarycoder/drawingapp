@@ -1,10 +1,14 @@
 package com.g.baseassignments;
 
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
+import android.content.ContentResolver;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -13,18 +17,37 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.provider.MediaStore;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.webkit.MimeTypeMap;
 import android.widget.ImageButton;
 import android.widget.Toast;
+import android.app.ProgressDialog;
 
+
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.FirebaseOptions;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.core.Constants;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.OnProgressListener;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -34,16 +57,26 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import java.util.Random;
+import java.util.UUID;
+
+import android.widget.ProgressBar;
 
 public class MainActivity extends AppCompatActivity {
     private PaintView paintView;
     private FirebaseAuth mauth;
+    Uri filePath;
+    private StorageReference stRef;
+    DatabaseReference dbRef;
     ImageButton undo,redo,clear_screen,change_back,blur_thing,save,lock,saved_ss;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mauth=FirebaseAuth.getInstance();
         setContentView(R.layout.activity_main);
+       //Firebase variables are initiated from here
+        stRef=FirebaseStorage.getInstance().getReference().child("doodle");
+        dbRef=FirebaseDatabase.getInstance().getReference().child("doodle2");
+        //special declarations end here
         paintView = (PaintView) findViewById(R.id.paintView);
         DisplayMetrics metrics = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getMetrics(metrics);
@@ -59,22 +92,7 @@ public class MainActivity extends AppCompatActivity {
         saved_ss.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.M) {
-                  if(checkSelfPermission(Manifest.permission.MEDIA_CONTENT_CONTROL)!=PackageManager.PERMISSION_GRANTED)
-                    {
-                        ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission
-                                .MEDIA_CONTENT_CONTROL}, 1);
-                    }
-                    else
-                    {
-                        sendBroadcast(new Intent(Intent.ACTION_MEDIA_MOUNTED,
-                                Uri.parse("file://" + Environment.getExternalStorageDirectory())));
-                    }
-                }
-                else
-                {
-
-                }
+                OpenGallery();
                 }
         });
         blur_thing.setOnClickListener(new View.OnClickListener() {
@@ -105,7 +123,42 @@ public class MainActivity extends AppCompatActivity {
                 if(isStoragePermissionGranted()&&isExternalStorageAvailable()&&isStoragePermissionGranted()) {
                     Bitmap bitmap = paintView.getmBitmap();
                     SaveImage(bitmap);
-                    //save(bitmap);
+                    filePath=getImageUri(MainActivity.this,bitmap);
+                    Random generator = new Random();
+                    int n = 10000;
+                    n = generator.nextInt(n);
+                    String fname = "Image-"+ n +".jpg";
+
+                    StorageReference stst=stRef.child(fname);
+             UploadTask upup=stst.putFile(filePath);
+             upup.addOnFailureListener(new OnFailureListener() {
+             @Override
+              public void onFailure(@NonNull Exception e) {
+
+                 Toast.makeText(MainActivity.this,
+                         "Failed ......................", Toast.LENGTH_SHORT).show();
+
+                }
+            }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+            @Override
+            public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+
+                Toast.makeText(MainActivity.this,
+                        "Shop Image uploaded Successfully ...", Toast.LENGTH_SHORT).show();
+
+            }
+            }).addOnCompleteListener(new OnCompleteListener<UploadTask.TaskSnapshot>() {
+            @Override
+            public void onComplete(@NonNull Task<UploadTask.TaskSnapshot> task) {
+             if(task.isSuccessful())
+             {
+                 Toast.makeText(MainActivity.this,
+                         "Shop Image uploaded Successfully 2...", Toast.LENGTH_SHORT).show();
+
+             }
+            }
+            });
+                    paintView.clear();
                 }
                 else
                 {
@@ -114,10 +167,74 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+    private void OpenGallery()
+    {
+        Intent galleryIntent = new Intent();
+        galleryIntent.setAction(Intent.ACTION_GET_CONTENT);
+        galleryIntent.setType("image/*");
+        startActivityForResult(galleryIntent, 1);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if(requestCode==1 && resultCode==RESULT_OK && data!=null)
+        {
+            filePath=data.getData();
+            Random generator = new Random();
+            int n = 10000;
+            n = generator.nextInt(n);
+            String fname = "Image-"+ n +".jpg";
+
+            StorageReference stst=stRef.child(fname);
+            UploadTask upup=stst.putFile(filePath);
+            upup.addOnFailureListener(new OnFailureListener() {
+                @Override
+                public void onFailure(@NonNull Exception e) {
+
+                    Toast.makeText(MainActivity.this,
+                            "Failed ......................", Toast.LENGTH_SHORT).show();
+
+                }
+            }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                @Override
+                public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+
+                    Toast.makeText(MainActivity.this,
+                            "Shop Image uploaded Successfully ...", Toast.LENGTH_SHORT).show();
+
+                }
+            }).addOnCompleteListener(new OnCompleteListener<UploadTask.TaskSnapshot>() {
+                @Override
+                public void onComplete(@NonNull Task<UploadTask.TaskSnapshot> task) {
+                    if(task.isSuccessful())
+                    {
+                        Toast.makeText(MainActivity.this,
+                                "Shop Image uploaded Successfully 2...", Toast.LENGTH_SHORT).show();
+
+                    }
+                }
+            });
+        }
+    }
+
+    public Uri getImageUri(Context inContext, Bitmap inImage) {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        inImage.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
+        String path = MediaStore.Images.Media.insertImage(inContext.getContentResolver(), inImage, "Title", null);
+        return Uri.parse(path);
+    }
+    private String getFileExtension(Uri uri) {
+        ContentResolver cR = getContentResolver();
+        MimeTypeMap mime = MimeTypeMap.getSingleton();
+        return mime.getExtensionFromMimeType(cR.getType(uri));
+    }
+
     public  boolean isStoragePermissionGranted() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     == PackageManager.PERMISSION_GRANTED) {
+                //save();
                 return true;
             } else {
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission
@@ -129,42 +246,12 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
     }
-    private void save(Bitmap bitmap){
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss", Locale.ENGLISH);
-        String filename = sdf.format(new Date());
-
-        try {
-            OutputStream fOut = null;
-            File file = new File(Environment.getExternalStorageDirectory()+File.separator+Environment.DIRECTORY_PICTURES
-                    +File.separator+"MYFile");
-            if (!file.exists()) {
-                file.mkdirs();
-                Toast.makeText(MainActivity.this,"Directory or folder made",Toast.LENGTH_SHORT).show();
-            }
-            else
-            {
-                Toast.makeText(MainActivity.this,"Directory or folder not made",Toast.LENGTH_SHORT).show();
-            }
-            fOut = new FileOutputStream(file+File.separator+"Image" + ".png");
-            //your bitmap
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, fOut);
-            fOut.flush();
-            fOut.close();
-            paintView.clear();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+    //this method is a success
     private void SaveImage(Bitmap finalBitmap) {
 
 //        String root = MainActivity.this.getApplicationContext().getFilesDir();
-        File myDir = new File(Environment.getExternalStorageDirectory(), "saved_images");
-        if (!myDir.exists()) {
-            myDir.mkdirs();
-        }
-        File subdir = new File(myDir,"subdir");
+        File myDir = Environment.getExternalStorageDirectory();
+        File subdir = new File(myDir.getAbsolutePath(),"/subdir/");
         if(!subdir.exists())
         {
             subdir.mkdirs();
@@ -172,21 +259,22 @@ public class MainActivity extends AppCompatActivity {
         Random generator = new Random();
         int n = 10000;
         n = generator.nextInt(n);
-        String fname = "Image-"+ n +".jpeg";
+        String fname = "Image-"+ n +".jpg";
         File file = new File (myDir,fname);
         if (file.exists ()) {
              file.delete ();
         }
             try {
-                file.createNewFile();
+                //file.createNewFile();
                 FileOutputStream out = new FileOutputStream(file);
                 finalBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out);
                 out.flush();
                 out.close();
+                Toast.makeText(MainActivity.this,"Image Saved",Toast.LENGTH_SHORT).show();
                 paintView.clear();
-
             } catch (Exception e) {
             e.printStackTrace();
+            Toast.makeText(MainActivity.this,"Image Not saved ",Toast.LENGTH_SHORT).show();
         }
 
     }
