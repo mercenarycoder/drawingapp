@@ -39,7 +39,7 @@ public class PaintView extends View {
     private Canvas mCanvas;
     Context context;
     private ArrayList<Path> paths2 = new ArrayList<Path>();
-    private ArrayList<Path> undonePaths = new ArrayList<Path>();
+    private ArrayList<FingerPath> undonePaths = new ArrayList<FingerPath>();
     private Paint mBitmapPaint = new Paint(Paint.DITHER_FLAG);
     private static PaintView obj;
     public PaintView(Context context) {
@@ -128,8 +128,8 @@ public class PaintView extends View {
         canvas.restore();
     }
     public void onClickUndo () {
-        if (paths2.size()>0) {
-            undonePaths.add(paths2.remove(paths2.size()-1));
+        if (paths.size()>0) {
+            undonePaths.add(paths.remove(paths.size()-1));
             invalidate();
         }else{
             Toast.makeText(context,"Undo cannot be done",Toast.LENGTH_SHORT).show();
@@ -137,7 +137,7 @@ public class PaintView extends View {
     }
     public void onClickRedo (){
         if (undonePaths.size()>0){
-            paths2.add(undonePaths.remove(undonePaths.size()-1));
+            paths.add(undonePaths.remove(undonePaths.size()-1));
             invalidate();
         }else{
             Toast.makeText(context,"Redo cannot be done",Toast.LENGTH_SHORT).show();

@@ -119,11 +119,13 @@ public class MainActivity extends AppCompatActivity {
               if(rubg%2!=0) {
                   rubber = true;
                   paintView.currentColor = paintView.DEFAULT_BG_COLOR;
+                  change_back.setBackgroundResource(R.drawable.btn_round);
               }
               else
               {
                  rubber=false;
                  paintView.currentColor=curC;
+                 change_back.setBackgroundResource(R.drawable.btn_round2);
               }
             }
         });
