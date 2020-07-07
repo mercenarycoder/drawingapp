@@ -5,6 +5,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import yuku.ambilwarna.AmbilWarnaDialog;
 
 import android.Manifest;
 import android.content.ContentResolver;
@@ -12,6 +13,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
@@ -27,6 +29,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.webkit.MimeTypeMap;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 import android.app.ProgressDialog;
 
@@ -65,12 +68,18 @@ public class MainActivity extends AppCompatActivity {
     private PaintView paintView;
     private FirebaseAuth mauth;
     Uri filePath;
+    Context context;
     private StorageReference stRef;
     DatabaseReference dbRef;
-    ImageButton undo,redo,clear_screen,change_back,blur_thing,save,lock,saved_ss;
+    boolean rubber=false;
+    int rubg=0,curC=Color.RED;
+
+    private LinearLayout colorchoose;
+    ImageButton undo,redo,clear_screen,change_back,blur_thing,save,lock,saved_ss,close_chooser;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        context=MainActivity.this;
         mauth=FirebaseAuth.getInstance();
         setContentView(R.layout.activity_main);
        //Firebase variables are initiated from here
@@ -83,24 +92,62 @@ public class MainActivity extends AppCompatActivity {
         paintView.init(metrics);
         undo=(ImageButton)findViewById(R.id.undo);
         redo=(ImageButton)findViewById(R.id.redo);
+        //colorchoose=(LinearLayout)findViewById(R.id.colorchoose);
         clear_screen=(ImageButton)findViewById(R.id.clear_screen);
         change_back=(ImageButton)findViewById(R.id.change_back);
         blur_thing=(ImageButton)findViewById(R.id.blur_thing);
         save=(ImageButton)findViewById(R.id.save);
         lock=(ImageButton)findViewById(R.id.lock);
+        //close_chooser=(ImageButton)findViewById(R.id.close_chooser);
         saved_ss=(ImageButton)findViewById(R.id.saved_ss);
-        saved_ss.setOnClickListener(new View.OnClickListener() {
+        undo.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                OpenGallery();
-                }
+                paintView.onClickUndo();
+            }
+        });
+        redo.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                paintView.onClickRedo();
+            }
+        });
+        change_back.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+              rubg++;
+              if(rubg%2!=0) {
+                  rubber = true;
+                  paintView.currentColor = paintView.DEFAULT_BG_COLOR;
+              }
+              else
+              {
+                 rubber=false;
+                 paintView.currentColor=curC;
+              }
+            }
         });
         blur_thing.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                paintView.blur();
+            if(!rubber) {
+                openColorPicker();
             }
+            else
+            {
+                Toast.makeText(context,"Rubber is on Turn it off First",Toast.LENGTH_SHORT).show();
+            }
+          }
         });
+
+        saved_ss.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+               Intent intent=new Intent(MainActivity.this,CanvasActivity18.class);
+               startActivity(intent);
+                }
+        });
+
         clear_screen.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -166,6 +213,20 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+    public void openColorPicker() {
+        AmbilWarnaDialog colorPicker = new AmbilWarnaDialog(this, Color.RED, new AmbilWarnaDialog.OnAmbilWarnaListener() {
+            @Override
+            public void onCancel(AmbilWarnaDialog dialog) {
+            }
+            @Override
+            public void onOk(AmbilWarnaDialog dialog, int color) {
+                Toast.makeText(context, String.valueOf(color), Toast.LENGTH_SHORT).show();
+                paintView.currentColor = color;
+                curC = color;
+            }
+        });
+        colorPicker.show();
     }
     private void OpenGallery()
     {
